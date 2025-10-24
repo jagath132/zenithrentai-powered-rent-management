@@ -12,12 +12,10 @@ import UpdatePassword from './components/auth/UpdatePassword';
 export type View = 'dashboard' | 'properties' | 'tenants' | 'payments';
 
 const MainApp: React.FC = () => {
-    const { currentUser, loading, passwordRecoverySession } = useAppContext();
+    const { currentUser, passwordRecoverySession } = useAppContext();
     const [currentView, setCurrentView] = React.useState<View>('dashboard');
 
-    if (loading) {
-        return <div className="flex items-center justify-center h-screen"><div>Loading...</div></div>;
-    }
+
 
     if (passwordRecoverySession) {
         return <UpdatePassword />;
