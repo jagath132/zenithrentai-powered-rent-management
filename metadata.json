@@ -1,0 +1,5 @@
+{
+  "name": "ZenithRent - AI-Powered Rent Management",
+  "description": "An interactive and fully functional rent management system. Track properties, tenants, payments, and maintenance requests. Features AI-powered tools like a lease clause explainer and maintenance prioritization to streamline landlord tasks.",
+  "requestFramePermissions": []
+}

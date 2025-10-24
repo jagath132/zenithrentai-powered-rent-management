@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZenithRent - Rent Management System</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon.ico" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#8b5cf6",
+              "primary-dark": "#7c3aed",
+              secondary: "#14b8a6",
+              light: "#F9FAFB",
+              dark: "#1F2937",
+              medium: "#6B7280",
+            },
+            fontFamily: {
+              sans: ["Inter", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "recharts": "https://aistudiocdn.com/recharts@^3.3.0",
+          "react/": "https://aistudiocdn.com/react@^18.2.0/",
+          "react": "https://aistudiocdn.com/react@^18.2.0",
+          "react-dom": "https://aistudiocdn.com/react-dom@^18.2.0",
+          "react-dom/": "https://aistudiocdn.com/react-dom@^18.2.0/",
+          "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0",
+          "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="/index.css" />
+  </head>
+  <body class="bg-light font-sans antialiased">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
