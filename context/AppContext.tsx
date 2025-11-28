@@ -7,15 +7,36 @@ import React, {
   useEffect,
 } from "react";
 import { Property, Tenant, Payment, PaymentStatus, User } from "../types";
-import { supabase } from "../lib/supabaseClient";
-import { Session } from "@supabase/supabase-js";
+import { auth, db } from "../lib/firebaseClient";
+import {
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+  updatePassword as firebaseUpdatePassword,
+  sendEmailVerification,
+  User as FirebaseUser,
+} from "firebase/auth";
+import {
+  collection,
+  doc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  setDoc,
+  getDoc,
+} from "firebase/firestore";
 
 interface AppContextType {
   properties: Property[];
   tenants: Tenant[];
   payments: Payment[];
   currentUser: User | null;
-  passwordRecoverySession: Session | null;
+  passwordRecoveryMode: boolean;
   error: string | null;
   addProperty: (
     property: Omit<Property, "id" | "status" | "user_id">
@@ -54,56 +75,82 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [passwordRecoverySession, setPasswordRecoverySession] =
-    useState<Session | null>(null);
+  const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+
+  // Check for password recovery mode from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get("mode");
+    if (mode === "resetPassword") {
+      setPasswordRecoveryMode(true);
+      // Clean up the URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
-        if (event === "PASSWORD_RECOVERY") {
-          setPasswordRecoverySession(session);
-          setCurrentUser(null);
-        } else if (session?.user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("name")
-            .eq("id", session.user.id)
-            .single();
-          setCurrentUser({
-            id: session.user.id,
-            email: session.user.email,
-            name: profile?.name || "",
-          });
-          setPasswordRecoverySession(null);
+        if (user) {
+          // Check if email is verified before allowing access
+          if (!user.emailVerified) {
+            // Sign out unverified users
+            await signOut(auth);
+            setFirebaseUser(null);
+            setCurrentUser(null);
+            setError(
+              "Email not confirmed. Please verify your email before logging in."
+            );
+            return;
+          }
+
+          setFirebaseUser(user);
+          // Get user profile from Firestore
+          const userDocRef = doc(db, "profiles", user.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists()) {
+            const profileData = userDoc.data();
+            setCurrentUser({
+              id: user.uid,
+              email: user.email || "",
+              name: profileData?.name || "",
+            });
+          } else {
+            // Profile doesn't exist yet, create a placeholder
+            setCurrentUser({
+              id: user.uid,
+              email: user.email || "",
+              name: "User",
+            });
+          }
+          setPasswordRecoveryMode(false);
+          setError(null); // Clear any previous errors
         } else {
+          setFirebaseUser(null);
           setCurrentUser(null);
-          setPasswordRecoverySession(null);
         }
       } catch (e: any) {
         console.error("Error during auth state change:", e);
         setError("Could not fetch user profile.");
-        // Still set user to show the app, even if profile fetch fails
-        if (session?.user) {
+        if (user) {
           setCurrentUser({
-            id: session.user.id,
-            email: session.user.email,
+            id: user.uid,
+            email: user.email || "",
             name: "User",
           });
         } else {
           setCurrentUser(null);
         }
-        setPasswordRecoverySession(null);
       }
     });
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   const fetchData = useCallback(async () => {
-    const session = await supabase.auth.getSession();
-    if (!session.data.session?.user) {
+    if (!firebaseUser) {
       setProperties([]);
       setTenants([]);
       setPayments([]);
@@ -111,31 +158,47 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     }
     setError(null);
     try {
-      const userId = session.data.session.user.id;
-      const { data: propertiesData, error: propertiesError } = await supabase
-        .from("properties")
-        .select("*")
-        .eq("user_id", userId);
-      if (propertiesError) throw propertiesError;
+      const userId = firebaseUser.uid;
+
+      // Fetch properties
+      const propertiesQuery = query(
+        collection(db, "properties"),
+        where("user_id", "==", userId)
+      );
+      const propertiesSnapshot = await getDocs(propertiesQuery);
+      const propertiesData = propertiesSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Property[];
       setProperties(propertiesData);
 
-      const { data: tenantsData, error: tenantsError } = await supabase
-        .from("tenants")
-        .select("*")
-        .eq("user_id", userId);
-      if (tenantsError) throw tenantsError;
+      // Fetch tenants
+      const tenantsQuery = query(
+        collection(db, "tenants"),
+        where("user_id", "==", userId)
+      );
+      const tenantsSnapshot = await getDocs(tenantsQuery);
+      const tenantsData = tenantsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Tenant[];
       setTenants(tenantsData);
 
-      const { data: paymentsData, error: paymentsError } = await supabase
-        .from("payments")
-        .select("*")
-        .eq("user_id", userId);
-      if (paymentsError) throw paymentsError;
+      // Fetch payments
+      const paymentsQuery = query(
+        collection(db, "payments"),
+        where("user_id", "==", userId)
+      );
+      const paymentsSnapshot = await getDocs(paymentsQuery);
+      const paymentsData = paymentsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Payment[];
       setPayments(paymentsData);
     } catch (e: any) {
       setError(e.message);
     }
-  }, []);
+  }, [firebaseUser]);
 
   useEffect(() => {
     if (currentUser) {
@@ -144,103 +207,125 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   }, [currentUser, fetchData]);
 
   const signup = async (userData: Omit<User, "id"> & { password: string }) => {
-    const { data, error } = await supabase.auth.signUp({
-      email: userData.email!,
-      password: userData.password,
-      options: {
-        data: {
-          name: userData.name,
-        },
-        emailRedirectTo: window.location.origin,
-      },
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      userData.email!,
+      userData.password
+    );
+
+    // Create user profile in Firestore
+    await setDoc(doc(db, "profiles", userCredential.user.uid), {
+      name: userData.name,
+      email: userData.email,
+      created_at: new Date().toISOString(),
     });
-    if (error) throw error;
-    // The user will be sent a confirmation email.
+
+    // Send verification email
+    if (userCredential.user) {
+      await sendEmailVerification(userCredential.user, {
+        url: `${window.location.origin}?confirmed=true`,
+      });
+    }
   };
 
   const login = async (
     credentials: Omit<User, "id" | "name"> & { password: string }
   ) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: credentials.email!,
-      password: credentials.password,
-    });
-    if (error) throw error;
-    // The onAuthStateChange listener will handle setting the user and fetching data
+    await signInWithEmailAndPassword(
+      auth,
+      credentials.email!,
+      credentials.password
+    );
+    // Email verification check is now handled in onAuthStateChanged listener
   };
 
   const logout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setCurrentUser(null);
-    setProperties([]);
-    setTenants([]);
-    setPayments([]);
+    try {
+      await signOut(auth);
+      setCurrentUser(null);
+      setProperties([]);
+      setTenants([]);
+      setPayments([]);
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Force logout even if there's an error
+      setCurrentUser(null);
+      setProperties([]);
+      setTenants([]);
+      setPayments([]);
+    }
   };
 
   const resendVerificationEmail = async (email: string) => {
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: email,
-    });
-    if (error) throw error;
+    // For Firebase, we need to sign in first to get the user, then send verification
+    // This is a limitation - we'll try to sign in temporarily
+    try {
+      if (auth.currentUser) {
+        await sendEmailVerification(auth.currentUser);
+      } else {
+        throw new Error(
+          "Please try signing in again to resend verification email."
+        );
+      }
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to resend verification email.");
+    }
   };
 
-  const sendPasswordResetEmail = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+  const sendPasswordReset = async (email: string) => {
+    await sendPasswordResetEmail(auth, email, {
+      url: window.location.origin,
     });
-    if (error) throw error;
   };
 
   const updatePassword = async (newPassword: string) => {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) throw error;
-    setPasswordRecoverySession(null);
+    if (!auth.currentUser) {
+      throw new Error("No user logged in");
+    }
+    await firebaseUpdatePassword(auth.currentUser, newPassword);
+    setPasswordRecoveryMode(false);
+    await signOut(auth);
   };
 
   const addProperty = async (
     propertyData: Omit<Property, "id" | "status" | "user_id">
   ) => {
     if (!currentUser) throw new Error("User not logged in");
-    const { error } = await supabase
-      .from("properties")
-      .insert([{ ...propertyData, status: "vacant", user_id: currentUser.id }]);
-    if (error) throw error;
+
+    await addDoc(collection(db, "properties"), {
+      ...propertyData,
+      status: "vacant",
+      user_id: currentUser.id,
+    });
     fetchData();
   };
 
   const updateProperty = async (updatedProperty: Property) => {
-    const { error } = await supabase
-      .from("properties")
-      .update(updatedProperty)
-      .eq("id", updatedProperty.id);
-    if (error) throw error;
+    const propertyRef = doc(db, "properties", updatedProperty.id);
+    const { id, ...propertyData } = updatedProperty;
+    await updateDoc(propertyRef, propertyData);
     fetchData();
   };
 
   const deleteProperty = async (id: string) => {
-    const { error } = await supabase.from("properties").delete().eq("id", id);
-    if (error) throw error;
+    await deleteDoc(doc(db, "properties", id));
     fetchData();
   };
 
   const addTenant = async (tenantData: Omit<Tenant, "id" | "user_id">) => {
     if (!currentUser) throw new Error("User not logged in");
 
-    const { data: newTenant, error } = await supabase
-      .from("tenants")
-      .insert([{ ...tenantData, user_id: currentUser.id }])
-      .select()
-      .single();
+    const docRef = await addDoc(collection(db, "tenants"), {
+      ...tenantData,
+      user_id: currentUser.id,
+    });
 
-    if (error) throw error;
-
-    if (newTenant?.property_id) {
-      await supabase
-        .from("properties")
-        .update({ status: "occupied", tenant_id: newTenant.id })
-        .eq("id", newTenant.property_id);
+    if (tenantData.property_id) {
+      const propertyRef = doc(db, "properties", tenantData.property_id);
+      await updateDoc(propertyRef, {
+        status: "occupied",
+        tenant_id: docRef.id,
+      });
     }
 
     fetchData();
@@ -254,25 +339,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     if (originalTenant.property_id !== updatedTenant.property_id) {
       // Unassign from old property if it exists
       if (originalTenant.property_id) {
-        await supabase
-          .from("properties")
-          .update({ status: "vacant", tenant_id: null })
-          .eq("id", originalTenant.property_id);
+        const oldPropertyRef = doc(
+          db,
+          "properties",
+          originalTenant.property_id
+        );
+        await updateDoc(oldPropertyRef, {
+          status: "vacant",
+          tenant_id: null,
+        });
       }
       // Assign to new property if it exists
       if (updatedTenant.property_id) {
-        await supabase
-          .from("properties")
-          .update({ status: "occupied", tenant_id: updatedTenant.id })
-          .eq("id", updatedTenant.property_id);
+        const newPropertyRef = doc(db, "properties", updatedTenant.property_id);
+        await updateDoc(newPropertyRef, {
+          status: "occupied",
+          tenant_id: updatedTenant.id,
+        });
       }
     }
 
-    const { error } = await supabase
-      .from("tenants")
-      .update(updatedTenant)
-      .eq("id", updatedTenant.id);
-    if (error) throw error;
+    const tenantRef = doc(db, "tenants", updatedTenant.id);
+    const { id, ...tenantData } = updatedTenant;
+    await updateDoc(tenantRef, tenantData);
 
     fetchData();
   };
@@ -283,15 +372,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
     // If tenant is assigned to a property, make it vacant
     if (tenantToDelete.property_id) {
-      await supabase
-        .from("properties")
-        .update({ status: "vacant", tenant_id: null })
-        .eq("id", tenantToDelete.property_id);
+      const propertyRef = doc(db, "properties", tenantToDelete.property_id);
+      await updateDoc(propertyRef, {
+        status: "vacant",
+        tenant_id: null,
+      });
     }
 
-    const { error } = await supabase.from("tenants").delete().eq("id", id);
-    if (error) throw error;
-
+    await deleteDoc(doc(db, "tenants", id));
     fetchData();
   };
 
@@ -299,16 +387,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     tenantId: string,
     propertyId: string
   ) => {
-    const { error: propError } = await supabase
-      .from("properties")
-      .update({ status: "occupied", tenant_id: tenantId })
-      .eq("id", propertyId);
-    if (propError) throw propError;
-    const { error: tenantError } = await supabase
-      .from("tenants")
-      .update({ property_id: propertyId })
-      .eq("id", tenantId);
-    if (tenantError) throw tenantError;
+    const propertyRef = doc(db, "properties", propertyId);
+    await updateDoc(propertyRef, {
+      status: "occupied",
+      tenant_id: tenantId,
+    });
+
+    const tenantRef = doc(db, "tenants", tenantId);
+    await updateDoc(tenantRef, {
+      property_id: propertyId,
+    });
+
     fetchData();
   };
 
@@ -317,24 +406,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     if (!property || !property.tenant_id) return;
     const tenantId = property.tenant_id;
 
-    await supabase
-      .from("properties")
-      .update({ status: "vacant", tenant_id: null })
-      .eq("id", propertyId);
-    await supabase
-      .from("tenants")
-      .update({ property_id: null })
-      .eq("id", tenantId);
+    const propertyRef = doc(db, "properties", propertyId);
+    await updateDoc(propertyRef, {
+      status: "vacant",
+      tenant_id: null,
+    });
+
+    const tenantRef = doc(db, "tenants", tenantId);
+    await updateDoc(tenantRef, {
+      property_id: null,
+    });
 
     fetchData();
   };
 
   const logPayment = async (paymentData: Omit<Payment, "id" | "user_id">) => {
     if (!currentUser) throw new Error("User not logged in");
-    const { error } = await supabase
-      .from("payments")
-      .insert([{ ...paymentData, user_id: currentUser.id }]);
-    if (error) throw error;
+
+    await addDoc(collection(db, "payments"), {
+      ...paymentData,
+      user_id: currentUser.id,
+    });
     fetchData();
   };
 
@@ -370,7 +462,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         tenants,
         payments,
         currentUser,
-        passwordRecoverySession,
+        passwordRecoveryMode,
         error,
         addProperty,
         updateProperty,
@@ -386,7 +478,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         login,
         logout,
         resendVerificationEmail,
-        sendPasswordResetEmail,
+        sendPasswordResetEmail: sendPasswordReset,
         updatePassword,
       }}
     >

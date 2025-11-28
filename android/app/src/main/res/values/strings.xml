@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ZenithRent</string>
+    <string name="title_activity_main">ZenithRent</string>
+    <string name="package_name">com.zenithrent.app</string>
+    <string name="custom_url_scheme">com.zenithrent.app</string>
+</resources>

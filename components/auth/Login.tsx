@@ -29,12 +29,25 @@ const Login: React.FC<LoginProps> = ({ onToggleView, onForgotPassword }) => {
         try {
             await login({ email, password });
         } catch (err: any) {
-             if (err.message.includes('Email not confirmed')) {
-                setError('Please verify your email address before logging in.');
+            // Handle specific Firebase error codes with user-friendly messages
+            let errorMessage = 'Failed to log in.';
+            if (err.code === 'auth/user-not-found') {
+                errorMessage = 'No account found with this email address.';
+            } else if (err.code === 'auth/wrong-password') {
+                errorMessage = 'Incorrect password. Please try again.';
+            } else if (err.code === 'auth/invalid-email') {
+                errorMessage = 'Please enter a valid email address.';
+            } else if (err.code === 'auth/user-disabled') {
+                errorMessage = 'This account has been disabled.';
+            } else if (err.code === 'auth/too-many-requests') {
+                errorMessage = 'Too many failed login attempts. Please try again later.';
+            } else if (err.message && err.message.includes('Email not confirmed')) {
+                errorMessage = 'Please verify your email address before logging in.';
                 setShowResendVerification(true);
-            } else {
-                setError(err.message || 'Failed to log in.');
+            } else if (err.message) {
+                errorMessage = err.message;
             }
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
