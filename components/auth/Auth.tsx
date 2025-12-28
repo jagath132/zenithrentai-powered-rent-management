@@ -6,7 +6,11 @@ import ForgotPassword from "./ForgotPassword";
 
 type AuthView = "login" | "signup" | "forgotPassword";
 
-const Auth: React.FC = () => {
+interface AuthProps {
+  onBackToLanding?: () => void;
+}
+
+const Auth: React.FC<AuthProps> = ({ onBackToLanding }) => {
   const { currentUser } = useAppContext();
   const [view, setView] = useState<AuthView>("login");
   const [showConfirmationPopup, setShowConfirmationPopup] = useState(false);
@@ -46,6 +50,29 @@ const Auth: React.FC = () => {
 
         {/* Form Container */}
         <div className="p-8">
+          {onBackToLanding && (
+            <div className="mb-6 text-center">
+              <button
+                onClick={onBackToLanding}
+                className="text-blue-400 hover:text-blue-300 text-sm font-medium flex items-center justify-center"
+              >
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+                Back to Home
+              </button>
+            </div>
+          )}
           {view === "login" && (
             <Login
               onToggleView={() => setView("signup")}

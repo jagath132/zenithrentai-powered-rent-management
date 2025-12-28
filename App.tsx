@@ -26,7 +26,7 @@ const MainApp: React.FC = () => {
     if (!showAuth) {
       return <LandingPage onGetStarted={() => setShowAuth(true)} />;
     }
-    return <Auth />;
+    return <Auth onBackToLanding={() => setShowAuth(false)} />;
   }
 
   const renderView = () => {
