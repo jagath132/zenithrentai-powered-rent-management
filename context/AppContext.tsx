@@ -94,18 +94,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
         if (user) {
-          // Check if email is verified before allowing access
-          if (!user.emailVerified) {
-            // Sign out unverified users
-            await signOut(auth);
-            setFirebaseUser(null);
-            setCurrentUser(null);
-            setError(
-              "Email not confirmed. Please verify your email before logging in."
-            );
-            return;
-          }
-
           setFirebaseUser(user);
           // Get user profile from Firestore
           const userDocRef = doc(db, "profiles", user.uid);
