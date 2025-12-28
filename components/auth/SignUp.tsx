@@ -90,16 +90,32 @@ const SignUp: React.FC<SignUpProps> = ({ onToggleView }) => {
   if (signupSuccess) {
     return (
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg
+            className="w-8 h-8 text-green-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
           Account Created!
         </h2>
-        <p className="text-gray-600">
-          Please check your email <span className="font-semibold">{email}</span>{" "}
-          for a verification link to complete your registration.
+        <p className="text-gray-600 mb-4">
+          Please check your email{" "}
+          <span className="font-semibold text-blue-600">{email}</span> for a
+          verification link to complete your registration.
         </p>
         <button
           onClick={onToggleView}
-          className="mt-6 font-medium text-primary hover:text-primary-dark"
+          className="text-blue-600 hover:text-blue-800 font-medium"
         >
           Back to Sign In
         </button>
@@ -109,14 +125,18 @@ const SignUp: React.FC<SignUpProps> = ({ onToggleView }) => {
 
   return (
     <div>
-      <h2 className="text-3xl font-bold text-gray-800 mb-4">Create Account</h2>
-      <p className="text-gray-600 mb-8">Get started with ZenithRent today!</p>
+      <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">
+        Create Account
+      </h2>
+      <p className="text-gray-600 mb-6 text-center">Join ZenithRent today</p>
       {error && (
-        <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4">{error}</p>
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-4">
+          <p className="text-sm">{error}</p>
+        </div>
       )}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Full Name
           </label>
           <input
@@ -124,11 +144,12 @@ const SignUp: React.FC<SignUpProps> = ({ onToggleView }) => {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary"
+            className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            placeholder="Enter your full name"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Email Address
           </label>
           <input
@@ -136,11 +157,12 @@ const SignUp: React.FC<SignUpProps> = ({ onToggleView }) => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary"
+            className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            placeholder="Enter your email"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Password
           </label>
           <div className="relative">
@@ -150,12 +172,13 @@ const SignUp: React.FC<SignUpProps> = ({ onToggleView }) => {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary pr-10"
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder="Create a password"
             />
             <button
               type="button"
               onClick={() => setPasswordVisible(!passwordVisible)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5"
+              className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
               aria-label="Toggle password visibility"
             >
               {passwordVisible ? <EyeOffIcon /> : <EyeIcon />}
@@ -166,9 +189,35 @@ const SignUp: React.FC<SignUpProps> = ({ onToggleView }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:bg-opacity-50"
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            {loading ? "Creating Account..." : "Create Account"}
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <svg
+                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Creating Account...
+              </div>
+            ) : (
+              "Create Account"
+            )}
           </button>
         </div>
       </form>
@@ -176,7 +225,7 @@ const SignUp: React.FC<SignUpProps> = ({ onToggleView }) => {
         Already have an account?{" "}
         <button
           onClick={onToggleView}
-          className="font-medium text-primary hover:text-primary-dark"
+          className="font-medium text-blue-600 hover:text-blue-800"
         >
           Sign in
         </button>

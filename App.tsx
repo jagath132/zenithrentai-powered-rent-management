@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import Properties from "./components/Properties";
@@ -7,18 +7,25 @@ import Payments from "./components/Payments";
 import { AppProvider, useAppContext } from "./context/AppContext";
 import Auth from "./components/auth/Auth";
 import UpdatePassword from "./components/auth/UpdatePassword";
+import LandingPage from "./components/LandingPage";
+
+console.log("App component loaded");
 
 export type View = "dashboard" | "properties" | "tenants" | "payments";
 
 const MainApp: React.FC = () => {
   const { currentUser, passwordRecoveryMode } = useAppContext();
   const [currentView, setCurrentView] = React.useState<View>("dashboard");
+  const [showAuth, setShowAuth] = useState(false);
 
   if (passwordRecoveryMode) {
     return <UpdatePassword />;
   }
 
   if (!currentUser) {
+    if (!showAuth) {
+      return <LandingPage onGetStarted={() => setShowAuth(true)} />;
+    }
     return <Auth />;
   }
 
